@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__supabase__search_docs",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(npm run build:*)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright",
+    "context7",
+    "sequential-thinking",
+    "shadcn",
+    "supabase"
+  ]
+}
