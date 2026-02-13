@@ -1,6 +1,6 @@
 # 개발 로드맵
 
-> PRD 기반 자동 생성 | 최종 업데이트: 2026-02-13
+> PRD 기반 자동 생성 | 최종 업데이트: 2026-02-14
 > 원본 PRD: `docs/PRD.md` (모임 이벤트 관리 웹 MVP)
 
 ---
@@ -10,7 +10,7 @@
 | 페이즈 | 상태 | 진행률 | 설명 |
 |--------|------|--------|------|
 | Phase 0: 사용자 인증 | 완료 | 4/5 완료 | 이메일/Google 로그인, 세션 관리 (redirect_to 미구현) |
-| Phase 1: 데이터베이스 및 기반 설정 | 대기 | 0/7 완료 | DB 마이그레이션, RLS, RPC, 타입, 유틸리티 |
+| Phase 1: 데이터베이스 및 기반 설정 | ✅ 완료 | 7/7 완료 | DB 마이그레이션, RLS, RPC, 타입, 유틸리티 |
 | Phase 2: 이벤트 핵심 기능 (CRUD) | 대기 | 0/8 완료 | 이벤트 생성/목록/상세/수정 |
 | Phase 3: 참여자 관리 | 대기 | 0/6 완료 | 참석 응답, 참여자 목록, 상태 뱃지 |
 | Phase 4: 초대 시스템 | 대기 | 0/7 완료 | 초대 링크, 비회원 참여, 랜딩 페이지 |
@@ -44,57 +44,50 @@
 
 ---
 
-## Phase 1: 데이터베이스 및 기반 설정
+## Phase 1: 데이터베이스 및 기반 설정 (구현 완료)
 
 > **목표**: 이벤트 관리 시스템의 데이터베이스 스키마, 보안 정책, 타입 시스템 구축
 > **우선순위**: P0 Critical
-> **예상 복잡도**: 중
+> **상태**: ✅ 완료 (2026-02-14)
 > **선행 조건**: Phase 0 완료
 
 ### 태스크 목록
 
-- [ ] **P1-01** events 테이블 마이그레이션 생성
-  - 상세: PRD 5.2절 events 테이블 스키마에 따라 Supabase 마이그레이션 작성. id(uuid PK), created_at, updated_at(트리거 자동 갱신), title(text NOT NULL), description(nullable text), host_id(FK -> auth.users), event_date(timestamptz NOT NULL), location(nullable text), max_participants(nullable integer), invite_code(UNIQUE text NOT NULL), status(text DEFAULT 'active'). updated_at 자동 갱신 트리거 함수도 함께 생성
-  - 관련 파일: Supabase 마이그레이션
-  - 의존성: 없음
+- [x] **P1-01** events 테이블 마이그레이션 생성
+  - 상세: PRD 5.2절 events 테이블 스키마에 따라 Supabase 마이그레이션 작성. id(uuid PK), created_at, updated_at(트리거 자동 갱신), title(text NOT NULL), description(nullable text), host_id(FK -> auth.users), event_date(timestamptz NOT NULL), location(nullable text), max_participants(nullable integer), invite_code(UNIQUE text NOT NULL), status(text DEFAULT 'active' CHECK). updated_at 자동 갱신 트리거 함수(`handle_updated_at`)도 함께 생성. invite_code, host_id 인덱스 추가
+  - 관련 파일: Supabase 마이그레이션 `create_events_table`
 
-- [ ] **P1-02** participants 테이블 마이그레이션 생성
-  - 상세: PRD 5.2절 participants 테이블 스키마에 따라 마이그레이션 작성. id(uuid PK), created_at, event_id(FK -> events ON DELETE CASCADE), user_id(nullable FK -> auth.users), guest_name(nullable text), rsvp_status(text DEFAULT 'pending'), note(nullable text). UNIQUE(event_id, user_id) 제약조건 + CHECK(user_id IS NOT NULL OR guest_name IS NOT NULL) 제약조건 포함
-  - 관련 파일: Supabase 마이그레이션
-  - 의존성: P1-01
+- [x] **P1-02** participants 테이블 마이그레이션 생성
+  - 상세: PRD 5.2절 participants 테이블 스키마에 따라 마이그레이션 작성. UNIQUE(event_id, user_id) 제약조건 + CHECK(user_id IS NOT NULL OR guest_name IS NOT NULL) 제약조건 포함. event_id, user_id 인덱스 추가
+  - 관련 파일: Supabase 마이그레이션 `create_participants_table`
 
-- [ ] **P1-03** announcements 테이블 마이그레이션 생성
-  - 상세: PRD 5.2절 announcements 테이블 스키마에 따라 마이그레이션 작성. id(uuid PK), created_at, event_id(FK -> events ON DELETE CASCADE), author_id(FK -> auth.users), content(text NOT NULL), is_pinned(boolean DEFAULT false)
-  - 관련 파일: Supabase 마이그레이션
-  - 의존성: P1-01
+- [x] **P1-03** announcements 테이블 마이그레이션 생성
+  - 상세: PRD 5.2절 announcements 테이블 스키마에 따라 마이그레이션 작성. event_id 인덱스 추가
+  - 관련 파일: Supabase 마이그레이션 `create_announcements_table`
 
-- [ ] **P1-04** RLS 정책 적용
-  - 상세: PRD 5.3절 보안 정책에 따라 3개 테이블에 RLS 정책 설정. events(SELECT: 호스트 또는 참여자, INSERT: 인증 사용자 host_id=본인, UPDATE/DELETE: 호스트만), participants(SELECT: 호스트 또는 본인, INSERT: 인증 사용자 user_id=본인, UPDATE: 본인만, DELETE: 본인 또는 호스트), announcements(SELECT: 호스트 또는 참여자, INSERT: 호스트만, UPDATE: 작성자만, DELETE: 작성자 또는 호스트)
-  - 관련 파일: Supabase 마이그레이션
-  - 의존성: P1-01, P1-02, P1-03
+- [x] **P1-04** RLS 정책 적용
+  - 상세: PRD 5.3절 보안 정책에 따라 3개 테이블에 RLS 정책 설정 완료. events(4개 정책), participants(4개 정책), announcements(4개 정책) - 총 12개 RLS 정책 적용
+  - 관련 파일: Supabase 마이그레이션 `add_rls_policies`
 
-- [ ] **P1-05** 비회원 접근용 RPC 함수 생성
-  - 상세: PRD 5.4절에 따라 SECURITY DEFINER 함수 2개 생성. `get_event_by_invite_code(code text)` - 초대 코드로 이벤트 공개 정보(제목, 날짜, 장소, 현재 참여자 수, 최대 인원) 조회. `join_event_as_guest(invite_code text, guest_name text, rsvp_status text, note text)` - 비회원 이벤트 참여 등록. anon 역할에 실행 권한 부여. 최대 인원 초과 시 에러 반환 로직 포함
-  - 관련 파일: Supabase 마이그레이션
-  - 의존성: P1-01, P1-02
+- [x] **P1-05** 비회원 접근용 RPC 함수 생성
+  - 상세: SECURITY DEFINER 함수 2개 생성. `get_event_by_invite_code(code)` - 초대 코드로 이벤트 공개 정보 조회. `join_event_as_guest(p_invite_code, p_guest_name, p_rsvp_status, p_note)` - 비회원 이벤트 참여 등록 (최대 인원 초과 검증 포함). anon/authenticated 역할에 실행 권한 부여
+  - 관련 파일: Supabase 마이그레이션 `create_rpc_functions`
 
-- [ ] **P1-06** TypeScript 타입 생성 및 정의
-  - 상세: Supabase CLI로 자동 생성된 Database 타입을 기반으로 애플리케이션에서 사용할 타입 파일 작성. Event, Participant, Announcement 인터페이스, 이벤트 상태(EventStatus), RSVP 상태(RsvpStatus) 유니온 타입, 폼 입력용 타입(CreateEventInput, UpdateEventInput 등) 정의
+- [x] **P1-06** TypeScript 타입 생성 및 정의
+  - 상세: Supabase 자동 생성 Database 타입 + 애플리케이션 레벨 타입 정의. Event, Participant, Announcement Row 타입, EventStatus/RsvpStatus 유니온 타입, CreateEventInput/UpdateEventInput 폼 입력 타입, RPC 응답 타입(EventByInviteCode, GuestJoinResult)
   - 관련 파일: `lib/types/database.ts`, `lib/types/event.ts`
-  - 의존성: P1-01, P1-02, P1-03
 
-- [ ] **P1-07** 유틸리티 함수 및 프로젝트 기반 설정
-  - 상세: (1) `generateInviteCode()` - 8자리 hex 초대 코드 생성 함수. (2) shadcn/ui 추가 컴포넌트 설치: textarea, dialog, separator, avatar, tabs, select, toast. (3) 미들웨어 수정 - `/invite` 경로를 비인증 허용 목록에 추가 (`lib/supabase/proxy.ts`의 리다이렉트 조건에 `/invite` 예외 추가)
+- [x] **P1-07** 유틸리티 함수 및 프로젝트 기반 설정
+  - 상세: (1) `generateInviteCode()` - crypto.randomBytes 기반 8자리 hex 코드 생성. (2) shadcn/ui 추가 컴포넌트 설치: textarea, dialog, separator, avatar, tabs, select, sonner(toast 대체). (3) 미들웨어에 `/invite` 경로 비인증 허용 추가
   - 관련 파일: `lib/utils/invite-code.ts`, `lib/supabase/proxy.ts`, `components/ui/*`
-  - 의존성: 없음 (컴포넌트 설치와 유틸리티는 독립 작업)
 
 ### 완료 기준 (Definition of Done)
 
-- [ ] events, participants, announcements 테이블이 Supabase에 생성되어 있음
-- [ ] 각 테이블에 RLS 정책이 적용되어 비인가 접근이 차단됨
-- [ ] RPC 함수로 비회원이 초대 코드를 통해 이벤트 정보 조회 및 참여 가능
-- [ ] TypeScript 타입이 정의되어 IDE 자동완성 지원
-- [ ] `/invite/*` 경로에 비인증 사용자가 접근 가능
+- [x] events, participants, announcements 테이블이 Supabase에 생성되어 있음
+- [x] 각 테이블에 RLS 정책이 적용되어 비인가 접근이 차단됨
+- [x] RPC 함수로 비회원이 초대 코드를 통해 이벤트 정보 조회 및 참여 가능
+- [x] TypeScript 타입이 정의되어 IDE 자동완성 지원
+- [x] `/invite/*` 경로에 비인증 사용자가 접근 가능
 
 ---
 
