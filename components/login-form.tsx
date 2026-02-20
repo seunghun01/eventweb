@@ -16,24 +16,43 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type LoginFormProps = React.ComponentPropsWithoutRef<"div"> & {
+  searchParams?: Promise<{ redirect_to?: string }>;
+};
+
 export function LoginForm({
   className,
+  searchParams,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
   const router = useRouter();
+
+  // searchParams Promise에서 redirect_to 추출
+  if (searchParams && redirectTo === null) {
+    searchParams.then((params) => {
+      if (params.redirect_to) {
+        setRedirectTo(params.redirect_to);
+      }
+    });
+  }
 
   const handleGoogleLogin = async () => {
     const supabase = createClient();
     setError(null);
 
+    const callbackUrl = redirectTo
+      ? `${window.location.origin}/auth/callback?redirect_to=${encodeURIComponent(redirectTo)}`
+      : `${window.location.origin}/auth/callback`;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: callbackUrl,
       },
     });
 
@@ -54,8 +73,7 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.push("/protected");
+      router.push(redirectTo || "/protected");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
